@@ -1,2 +1,2 @@
-# simulador-de-catapulta
-Simulador de catapulta em HTML/CSS/JS
+# GeoSolo.AI
+Protótipo MVP - Solos do Semiárido (CE) em HTML/CSS/JS
