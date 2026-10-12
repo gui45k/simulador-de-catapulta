@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>GeoSolo AI — MVP</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f1ea;--card:#fff;--ink:#1d2a2f;--mut:#5d6b70;--acc:#8a4b1f;--acc2:#1f6f6b;--bd:#d9d2c3;--warn:#b3261e;--ok:#2e7d32}
+:root[data-theme="dark"]{--bg:#161b1d;--card:#1f2629;--ink:#e8e4da;--mut:#9aa6a9;--acc:#e0975c;--acc2:#5fc2bb;--bd:#33403f;--warn:#ff8a80;--ok:#81c784}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161b1d;--card:#1f2629;--ink:#e8e4da;--mut:#9aa6a9;--acc:#e0975c;--acc2:#5fc2bb;--bd:#33403f;--warn:#ff8a80;--ok:#81c784}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+header{background:var(--acc2);color:#fff;padding:12px 16px}header h1{margin:0;font:600 18px/1.2 Georgia,serif}header small{opacity:.85}
+nav{display:flex;gap:4px;overflow-x:auto;padding:8px;background:var(--card);border-bottom:1px solid var(--bd)}
+nav button{white-space:nowrap;border:1px solid var(--bd);background:none;color:var(--ink);padding:6px 10px;border-radius:6px;cursor:pointer}
+nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+main{max-width:980px;margin:auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px}
+h2{font:600 17px Georgia,serif;margin:0 0 8px;color:var(--acc)}h3{font-size:14px;margin:10px 0 4px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+label{display:block;font-size:12px;color:var(--mut)}input,select,textarea{width:100%;padding:6px;border:1px solid var(--bd);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit}
+button.p{background:var(--acc);color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer;margin:6px 6px 0 0}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--bd);padding:4px 6px;text-align:left}
+.sc{overflow-x:auto}.tag{font-size:11px;padding:1px 6px;border-radius:9px;border:1px solid var(--bd);margin-right:4px}
+.M{color:var(--acc2)}.C{color:var(--acc)}.H{color:var(--mut);font-style:italic}.w{color:var(--warn)}.ok{color:var(--ok)}
+pre{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;margin:0}.demo{background:#fff3cd;color:#5c4400;padding:6px 10px;border-radius:6px;font-size:13px;margin-bottom:10px}
+svg text{fill:var(--mut);font-size:10px}
+</style></head><body>
+<header><h1>GeoSolo AI <small>— protótipo MVP · solos do semiárido (CE)</small></h1></header>
+<nav id="nav"></nav><main id="m"></main>
+<script>
+const $=s=>document.querySelector(s);
+const TABS=['Painel','Análise','Comparar','Simulador','Planejamento','Assistente','Relatório'];
+const F=[['id','Identificação','',0],['local','Local de coleta','',0],['prof','Profundidade','m'],['data','Data de coleta','',0,'date'],['cond','Condições de coleta','',0],
+['p4','% passante #4 (4,75 mm)','%'],['p10','% passante #10 (2,0 mm)','%'],['p40','% passante #40 (0,425 mm)','%'],['p200','% passante #200 (0,075 mm)','%'],
+['w','Umidade natural w','%'],['LL','Limite de liquidez LL','%'],['LP','Limite de plasticidade LP','%'],['Gs','Massa específica dos grãos Gs','g/cm³'],['rd','Massa específica aparente seca ρd','g/cm³'],
+['comp','Compactação (pares w%:ρd, separados por ;)','',0],['cbr','CBR/ISC','%'],['exp','Expansão','%'],['obs','Observações de campo','',0]];
+let S=[{id:'DEMO-01 (FICTÍCIA)',local:'Local fictício – demonstração',prof:'1.0',data:'',cond:'',p4:'98',p10:'94',p40:'82',p200:'58',w:'15',LL:'48',LP:'22',Gs:'2.65',rd:'1.60',comp:'12:1.70;14:1.76;16:1.79;18:1.74;20:1.68',cbr:'8',exp:'1.2',obs:'Dado fictício para demonstração.'},
+{id:'DEMO-02 (FICTÍCIA)',local:'Local fictício – demonstração',prof:'0.5',data:'',cond:'',p4:'85',p10:'70',p40:'40',p200:'18',w:'9',LL:'28',LP:'20',Gs:'2.66',rd:'1.78',comp:'8:1.85;10:1.92;12:1.95;14:1.90',cbr:'22',exp:'0.3',obs:'Dado fictício para demonstração.'}];
+let cur=0,tab=0,ed=null;
+try{const t=localStorage.getItem('gs_v1');if(t){S=JSON.parse(t)}}catch(e){}
+const save=()=>{try{localStorage.setItem('gs_v1',JSON.stringify(S))}catch(e){}};
+const num=v=>(v===''||v==null||isNaN(+v))?null:+v;
+const f2=(x,d=2)=>x==null?'—':(+x).toFixed(d);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ===== Núcleo de cálculo (determinístico) ===== */
+function calc(s){const r={memo:[]},LL=num(s.LL),LP=num(s.LP),Gs=num(s.Gs),rd=num(s.rd),w=num(s.w);
+ if(LL!=null&&LP!=null){r.ip=Math.max(0,LL-LP);r.memo.push(`IP = LL − LP = ${LL} − ${LP} = ${f2(LL-LP)} % ${LL<=LP?'(NP: LL ≤ LP, IP=0)':''}`)}
+ if(Gs!=null&&rd!=null&&rd<Gs){r.e=Gs/rd-1;r.n=r.e/(1+r.e);r.memo.push(`e = Gs·ρw/ρd − 1 = ${Gs}·1,00/${rd} − 1 = ${f2(r.e,3)} (adotado ρw = 1,00 g/cm³)`,`n = e/(1+e) = ${f2(r.n*100)} %`);
+  if(w!=null){r.Sr=w/100*Gs/r.e*100;r.memo.push(`S = w·Gs/e = ${w/100}·${Gs}/${f2(r.e,3)} = ${f2(r.Sr)} %`)}}
+ r.uscs=uscs(s,r.ip);return r}
+function uscs(s,ip){const LL=num(s.LL),p200=num(s.p200),p4=num(s.p4);
+ if(p200==null)return{g:null,n:'Requer % passante #200.'};
+ const A=LL==null?null:0.73*(LL-20);
+ if(p200>=50){if(LL==null||ip==null)return{g:null,n:'Finos ≥ 50 %: requer LL e IP.'};
+  let g;if(LL>=50)g=ip>=A?'CH':'MH';else if(ip<4||ip<A)g='ML';else g=ip<=7?'CL-ML':'CL';
+  return{g,n:`Solo fino (USCS, ASTM D2487): linha A → IP = 0,73(LL−20) = ${f2(A)}. Sem análise de matéria orgânica.`}}
+ if(p4==null)return{g:null,n:'Solo grosso: requer % passante #4.'};
+ const gr=(100-p4)>(100-p200)/2?'G':'S',pref=gr==='G'?'Pedregulho':'Areia';
+ if(p200>12){if(LL==null||ip==null)return{g:null,n:'Finos > 12 %: requer LL e IP.'};
+  const c=(ip>=4&&ip>=A)?'C':'M';return{g:gr+c,n:`${pref} com finos (USCS). Conferir caso limítrofe CL-ML no laboratório.`}}
+ return{g:null,n:`${pref} com finos ≤ 12 %: classificação final (${gr}W/${gr}P) requer Cu e Cc da curva completa — não calculados aqui.`}}
+function parseComp(t){return (t||'').split(';').map(p=>p.split(':').map(Number)).filter(p=>p.length===2&&isFinite(p[0])&&isFinite(p[1]))}
+function validate(s){const E=[],W=[],g=[4,10,40,200].map(k=>num(s['p'+k]));
+ if(!s.id)E.push('Identificação obrigatória.');
+ [['p4'],['p10'],['p40'],['p200'],['w'],['LL'],['LP']].forEach(([k])=>{const v=num(s[k]);if(v!=null&&(v<0||(k[0]=='p'&&v>100)))E.push(`${k}: valor impossível (${v}).`)});
+ const gv=g.filter(x=>x!=null);for(let i=1;i<gv.length;i++)if(gv[i]>gv[i-1])E.push('Curva granulométrica não monótona (passante deve decrescer com a abertura).');
+ const Gs=num(s.Gs),rd=num(s.rd);if(Gs!=null&&(Gs<2.3||Gs>3.2))W.push('Gs fora da faixa usual (2,3–3,2) — conferir.');
+ if(Gs!=null&&rd!=null&&rd>=Gs)E.push('ρd ≥ Gs é fisicamente impossível.');
+ if(num(s.LL)!=null&&num(s.LP)!=null&&num(s.LL)<num(s.LP))W.push('LL < LP: tratado como NP — conferir ensaio.');
+ const r=calc(s);if(r.Sr>100)E.push(`Grau de saturação ${f2(r.Sr)} % > 100 %: inconsistência entre w, Gs e ρd.`);
+ const miss=['LL','LP','Gs','rd','w','p200'].filter(k=>num(s[k])==null);if(miss.length)W.push('Dados ausentes (não estimados): '+miss.join(', '));
+ return{E,W}}
+
+/* ===== Gráficos SVG ===== */
+function chart(series,o){const W=460,H=250,m={l:44,r:10,t:10,b:34};let xs=[],ys=[];series.forEach(s=>s.pts.forEach(p=>{xs.push(p[0]);ys.push(p[1])}));
+ if(!xs.length)return'<p class="H">Sem dados para o gráfico.</p>';
+ const tx=v=>o.log?Math.log10(v):v;let x0=Math.min(...xs.map(tx)),x1=Math.max(...xs.map(tx)),y0=o.y0??Math.min(...ys),y1=o.y1??Math.max(...ys);
+ if(x0==x1){x0-=1;x1+=1}if(y0==y1){y0-=1;y1+=1}if(o.y0==null){const d=(y1-y0)*.1;y0-=d;y1+=d}
+ const X=v=>m.l+(tx(v)-x0)/(x1-x0)*(W-m.l-m.r),Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b),C=['#8a4b1f','#1f6f6b','#7b3fa0','#c28a00'];
+ let g='';for(let i=0;i<=4;i++){const yv=y0+(y1-y0)*i/4;g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(yv)}" y2="${Y(yv)}" stroke="var(--bd)"/><text x="${m.l-4}" y="${Y(yv)+3}" text-anchor="end">${f2(yv,o.dy??1)}</text>`;
+  const xv=x0+(x1-x0)*i/4,lab=o.log?Math.pow(10,xv):xv;g+=`<text x="${m.l+(W-m.l-m.r)*i/4}" y="${H-m.b+12}" text-anchor="middle">${f2(lab,o.log?3:1)}</text>`}
+ g+=`<text x="${W/2}" y="${H-4}" text-anchor="middle">${o.xl}</text><text x="10" y="${H/2}" transform="rotate(-90 10 ${H/2})" text-anchor="middle">${o.yl}</text>`;
+ (o.lines||[]).forEach(l=>{g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(l[0])}" y2="${Y(l[0])}" stroke="${l[2]}" stroke-dasharray="4"/><text x="${W-m.r-2}" y="${Y(l[0])-3}" text-anchor="end">${l[1]}</text>`});
+ series.forEach((s,i)=>{const c=C[i%4],p=s.pts.slice().sort((a,b)=>a[0]-b[0]);g+=`<polyline fill="none" stroke="${c}" stroke-width="2" points="${p.map(q=>X(q[0])+','+Y(q[1])).join(' ')}"/>`+p.map(q=>`<circle cx="${X(q[0])}" cy="${Y(q[1])}" r="3" fill="${c}"/>`).join('')+`<text x="${m.l+6}" y="${m.t+10+i*11}" style="fill:${c}">● ${esc(s.name)}</text>`});
+ return`<div class="sc"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:320px">${g}</svg></div>`}
+const gran=s=>[[4.75,'p4'],[2,'p10'],[.425,'p40'],[.075,'p200']].filter(a=>num(s[a[1]])!=null).map(a=>[a[0],num(s[a[1]])]);
+
+/* ===== Telas ===== */
+const V={};
+V.Painel=()=>{const s=ed!=null?S[ed]:null;let h=`<div class="card"><h2>Amostras cadastradas</h2><div class="demo">Amostras DEMO são fictícias, apenas para demonstração. Substitua por dados de ensaios reais.</div><div class="sc"><table><tr><th></th><th>ID</th><th>Local</th><th>IP (%)</th><th>e</th><th>S (%)</th><th>USCS</th><th>Qualidade</th></tr>`;
+ S.forEach((x,i)=>{const r=calc(x),v=validate(x);h+=`<tr><td><input type="radio" name="c" ${i==cur?'checked':''} onclick="cur=${i}"></td><td>${esc(x.id)}</td><td>${esc(x.local)}</td><td>${f2(r.ip)}</td><td>${f2(r.e,3)}</td><td>${f2(r.Sr)}</td><td>${r.uscs.g||'—'}</td><td class="${v.E.length?'w':v.W.length?'':'ok'}">${v.E.length?v.E.length+' erro(s)':v.W.length?v.W.length+' aviso(s)':'OK'}</td><td><button class="p" onclick="edit(${i})">Editar</button></td></tr>`});
+ h+=`</table></div><button class="p" onclick="edit(-1)">+ Adicionar amostra</button></div>`;
+ if(ed!=null){const x=s||{};h+=`<div class="card"><h2>${s?'Editar':'Nova'} amostra</h2><div class="g">`+F.map(f=>`<div><label>${f[1]}${f[2]?' ('+f[2]+')':''}</label><input id="f_${f[0]}" type="${f[4]||(f[3]===0?'text':'number')}" step="any" value="${esc(x[f[0]])}"></div>`).join('')+`</div><p class="H">Campos vazios permanecem vazios: nada é estimado. Fotografias: anexar ao relatório final (não armazenadas neste protótipo).</p><button class="p" onclick="submitS()">Salvar</button><button class="p" style="background:var(--mut)" onclick="ed=null;go()">Cancelar</button><div id="vm"></div></div>`}
+ return h};
+window.edit=i=>{ed=i<0?-1:i;go()};
+window.submitS=()=>{const o={};F.forEach(f=>o[f[0]]=$('#f_'+f[0]).value.trim());const v=validate(o);
+ if(v.E.length){$('#vm').innerHTML='<p class="w">'+v.E.map(esc).join('<br>')+'</p>';return}
+ if(ed>=0)S[ed]=o;else{S.push(o);cur=S.length-1}ed=null;save();go()};
+const need=()=>S[cur]?null:'<div class="card">Cadastre uma amostra.</div>';
+V['Análise']=()=>{if(need())return need();const s=S[cur],r=calc(s),v=validate(s),p=parseComp(s.comp);
+ let h=`<div class="card"><h2>Análise — ${esc(s.id)}</h2>`+v.E.map(e=>`<p class="w">⚠ ${esc(e)}</p>`).join('')+v.W.map(e=>`<p>ℹ ${esc(e)}</p>`).join('')+
+ `<h3><span class="tag C">calculado</span>Índices físicos e plasticidade</h3><table><tr><th>Parâmetro</th><th>Valor</th><th>Unidade</th></tr><tr><td>Índice de plasticidade IP</td><td>${f2(r.ip)}</td><td>%</td></tr><tr><td>Índice de vazios e</td><td>${f2(r.e,3)}</td><td>—</td></tr><tr><td>Porosidade n</td><td>${r.n!=null?f2(r.n*100):'—'}</td><td>%</td></tr><tr><td>Grau de saturação S</td><td>${f2(r.Sr)}</td><td>%</td></tr></table>
+ <h3>Memória de cálculo</h3><pre>${r.memo.map(esc).join('\n')||'Dados insuficientes.'}</pre>
+ <h3><span class="tag C">calculado</span>Classificação — USCS (somente)</h3><p><b>${r.uscs.g||'Não classificável com os dados atuais'}</b><br>${esc(r.uscs.n)}<br><span class="H">AASHTO/SUCS-DNIT não implementados neste MVP. Correlações e limites (ex.: linha A) são empíricos; validar com o professor.</span></p></div>
+ <div class="card"><h3><span class="tag M">medido</span>Curva granulométrica (4 pontos informados)</h3>${chart([{name:s.id,pts:gran(s)}],{log:1,xl:'Abertura (mm, log)',yl:'% passante',y0:0,y1:100,dy:0})}</div>
+ <div class="card"><h3><span class="tag M">medido</span>Pontos de compactação</h3>${chart([{name:s.id,pts:p}],{xl:'w (%)',yl:'ρd (g/cm³)',dy:2})}`;
+ if(p.length){const m=p.reduce((a,b)=>b[1]>a[1]?b:a);h+=`<p>Máximo entre pontos medidos: ρd = ${m[1]} g/cm³ em w = ${m[0]} %. <span class="H">Sem ajuste de curva: ρdmáx/wót verdadeiros exigem ajuste e cobertura de ambos os ramos.</span></p>`}
+ h+=`</div><div class="card"><h3><span class="tag M">medido</span>CBR e expansão</h3><p>CBR = ${s.cbr||'—'} % · Expansão = ${s.exp||'—'} %. Valores exibidos como informados; energia de compactação e condição de ensaio devem ser registradas em observações.</p></div>`;return h};
+V.Comparar=()=>{let h='<div class="card"><h2>Comparação entre amostras</h2><div class="sc"><table><tr><th>ID</th><th>% #200</th><th>LL</th><th>IP</th><th>e</th><th>USCS</th><th>CBR</th><th>Exp.</th></tr>';
+ S.forEach(s=>{const r=calc(s);h+=`<tr><td>${esc(s.id)}</td><td>${s.p200||'—'}</td><td>${s.LL||'—'}</td><td>${f2(r.ip)}</td><td>${f2(r.e,3)}</td><td>${r.uscs.g||'—'}</td><td>${s.cbr||'—'}</td><td>${s.exp||'—'}</td></tr>`});
+ return h+`</table></div></div><div class="card"><h3>Granulometria</h3>${chart(S.map(s=>({name:s.id.slice(0,14),pts:gran(s)})),{log:1,xl:'Abertura (mm, log)',yl:'% passante',y0:0,y1:100,dy:0})}</div><div class="card"><h3>Compactação</h3>${chart(S.map(s=>({name:s.id.slice(0,14),pts:parseComp(s.comp)})),{xl:'w (%)',yl:'ρd (g/cm³)',dy:2})}</div>`};
+let SIM={w0:'15',w1:'30',w2:'8',cy:'4',cr:[]};
+V.Simulador=()=>{if(need())return need();const s=S[cur],LL=num(s.LL),LP=num(s.LP),c=+SIM.cy,pts=[],w0=+SIM.w0,w1=+SIM.w1,w2=+SIM.w2;pts.push([0,w0]);for(let i=1;i<=c;i++){pts.push([i-.5,w1]);pts.push([i,w2])}
+ const L=[];if(LP!=null)L.push([LP,'LP','#c28a00']);if(LL!=null)L.push([LL,'LL','#b3261e']);
+ return`<div class="card"><h2>Simulador de umedecimento/secagem — cenário</h2><div class="demo"><b>DEMONSTRAÇÃO HIPOTÉTICA.</b> Não há modelo calibrado: este módulo apenas traça o <i>cenário de umidade definido por você</i> em relação aos limites de Atterberg medidos. Nenhuma fissura, resistência ou propriedade é prevista.</div>
+ <div class="g">${[['w0','w inicial (%)'],['w1','w de umedecimento (%)'],['w2','w de secagem (%)'],['cy','Ciclos']].map(a=>`<div><label>${a[1]}</label><input type="number" id="s_${a[0]}" value="${SIM[a[0]]}"></div>`).join('')}</div><button class="p" onclick="simGo()">Traçar cenário</button>
+ ${chart([{name:'Cenário hipotético',pts}],{xl:'Ciclo',yl:'w (%)',lines:L,y0:0,dy:0})}
+ <h3><span class="tag M">medido</span>Registro experimental de fissuras</h3><div class="g"><div><label>Ciclo</label><input id="cr_c" type="number"></div><div><label>Nº de fissuras</label><input id="cr_n" type="number"></div><div><label>Abertura máx. (mm)</label><input id="cr_a" type="number" step="any"></div></div><button class="p" onclick="addCr()">Registrar</button>
+ <table><tr><th>Ciclo</th><th>Fissuras</th><th>Abertura (mm)</th></tr>${SIM.cr.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td>${x[2]}</td></tr>`).join('')}</table><p class="H">Comparação modelo × experimento: etapa futura, depende de modelo validado.</p></div>`};
+window.simGo=()=>{['w0','w1','w2','cy'].forEach(k=>SIM[k]=$('#s_'+k).value);go()};
+window.addCr=()=>{const a=['c','n','a'].map(k=>$('#cr_'+k).value);if(a[0]!='')SIM.cr.push(a);go()};
+V.Planejamento=()=>`<div class="card"><h2>Planejamento experimental</h2><div class="g">${[['q','Pergunta científica'],['h','Hipótese'],['vi','Variável independente'],['vd','Variável dependente'],['ct','Grupo de controle'],['nc','Nº de condições'],['rp','Réplicas por condição'],['mt','Método estatístico'],['cv','Critério de validação'],['inc','Incertezas conhecidas'],['cr','Cronograma (semanas)'],['cu','Custo estimado (R$)']].map(a=>`<div><label>${a[1]}</label><input id="e_${a[0]}"></div>`).join('')}</div><button class="p" onclick="plan()">Avaliar plano</button><div id="pl"></div></div>`;
+window.plan=()=>{const g=k=>$('#e_'+k).value.trim(),A=[];
+ if(!g('q'))A.push('Defina a pergunta científica antes de qualquer ensaio.');if(!g('h')||!/\S+/.test(g('h')))A.push('Hipótese ausente: ela deve ser testável e falseável.');
+ if(!g('vi')||!g('vd'))A.push('Identifique variável independente e dependente.');if(!g('ct'))A.push('Sem grupo de controle, efeitos não podem ser isolados.');
+ if(+g('rp')<3)A.push('Menos de 3 réplicas: baixa capacidade de estimar variabilidade. Discutir com o orientador.');
+ if(!g('mt'))A.push('Escolha o método estatístico ANTES de coletar dados.');if(!g('cv'))A.push('Defina critérios de validação (ex.: erro aceito, repetibilidade).');if(!g('inc'))A.push('Registre incertezas (balança, estufa, operador, heterogeneidade do solo).');
+ const tot=(+g('nc')||0)*(+g('rp')||0);$('#pl').innerHTML=`<h3>Avaliação</h3><p>Total de corpos de prova previstos: <b>${tot}</b></p>`+(A.length?A.map(a=>'<p class="w">⚠ '+esc(a)+'</p>').join(''):'<p class="ok">Estrutura completa. Ainda assim, submeta o protocolo ao professor orientador.</p>')+'<p class="H">Ensaios normalizados (ABNT/DNIT) devem seguir a norma vigente, consultada diretamente — este sistema não cita números de norma.</p>'};
+V.Assistente=()=>{if(need())return need();const s=S[cur],r=calc(s),v=validate(s),H=[],T=[];
+ if(r.ip!=null)H.push(r.ip>=15?'Hipótese: a plasticidade elevada (IP='+f2(r.ip)+' %) pode estar associada a maior sensibilidade a variações de umidade. Testável com ensaios de expansão e ciclos de umedecimento/secagem.':'Hipótese: IP baixo/moderado sugere menor sensibilidade a umidade; verificar experimentalmente.');
+ if(num(s.p200)>35)H.push('Hipótese: o teor de finos influencia o CBR após imersão; comparar amostras com p200 distintos.');
+ if(num(s.cbr)==null)T.push('CBR/ISC (justificativa: desempenho como subleito/base)');if(num(s.exp)==null)T.push('Expansão (justificativa: solos plásticos)');if(!parseComp(s.comp).length)T.push('Compactação (justificativa: define ρd e w de referência)');if(num(s.LL)==null)T.push('Limites de Atterberg (justificativa: classificação)');
+ const L=a=>a.length?'<ul>'+a.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'<p class="H">Nenhum.</p>';
+ return`<div class="card"><h2>Assistente científico — ${esc(s.id)}</h2><div class="demo">Assistente determinístico (regras). Integração opcional com modelo de linguagem: futura, sem substituir os cálculos.</div>
+ <h3><span class="tag M">medido</span>Dados informados</h3><p>${F.filter(f=>f[2]&&s[f[0]]).map(f=>f[0]+'='+esc(s[f[0]])).join(' · ')||'—'}</p>
+ <h3><span class="tag C">calculado</span></h3><pre>${r.memo.map(esc).join('\n')||'—'}</pre>
+ <h3 class="w">Inconsistências / dados insuficientes</h3>${L(v.E.concat(v.W))}<h3><span class="tag H">hipótese</span>Hipóteses testáveis</h3>${L(H)}<h3>Ensaios complementares sugeridos</h3>${L(T)}
+ <h3><span class="tag H">bibliografia</span>Busca</h3><p>Sem acesso a bases verificáveis aqui, não cito artigos. Palavras-chave sugeridas: "solos argilosos semiárido Ceará", "expansão contração solos tropicais", "ciclos de umedecimento e secagem solo compactado", "fissuração de solos argilosos". Pesquise no Portal de Periódicos CAPES e SciELO.</p></div>`};
+function report(){if(!S[cur])return'';const s=S[cur],r=calc(s),v=validate(s);return`RELATÓRIO PRELIMINAR — GeoSolo AI (MVP v0.1)\nGerado em: ${new Date().toLocaleString('pt-BR')}\nAmostra: ${s.id} | Local: ${s.local} | Prof.: ${s.prof} m\n\n[MEDIDOS]\n${F.filter(f=>f[2]&&s[f[0]]).map(f=>`${f[1]} = ${s[f[0]]} ${f[2]}`).join('\n')}\nCompactação: ${s.comp||'—'}\n\n[CALCULADOS]\n${r.memo.join('\n')}\nUSCS: ${r.uscs.g||'não classificável'} — ${r.uscs.n}\n\n[LIMITAÇÕES]\n${v.E.concat(v.W).join('\n')||'—'}\nResultados dependem exclusivamente dos dados informados. Software não validado experimentalmente; testes automatizados verificam apenas a aritmética.\nHipóteses e referências: ver Assistente (nenhuma referência verificada incluída).\n\n[REPRODUTIBILIDADE]\nVersão do software: 0.1-MVP · Método: cálculo determinístico no navegador · ρw=1,00 g/cm³`}
+function csv(){const k=F.map(f=>f[0]);return[k.join(',')].concat(S.map(s=>k.map(c=>'"'+String(s[c]??'').replace(/"/g,'""')+'"').join(','))).join('\n')}
+V['Relatório']=()=>`<div class="card"><h2>Relatório e exportação</h2><label>Relatório da amostra selecionada (copie e cole no Word)</label><textarea rows="14" readonly onclick="this.select()">${esc(report())}</textarea><label style="margin-top:8px">CSV de todas as amostras</label><textarea rows="5" readonly onclick="this.select()">${esc(csv())}</textarea></div><div class="card"><h2>Testes dos cálculos</h2><button class="p" onclick="tests()">Executar testes</button><pre id="tr"></pre><p class="H">Testes passando verificam a implementação — não validam cientificamente o sistema. Próxima etapa: comparar com ensaios reais, com métricas de erro e incertezas.</p></div>`;
+window.tests=()=>{const T=[],ok=(n,c)=>T.push((c?'✔ ':'✖ ')+n),cl=(a,b,t=.005)=>Math.abs(a-b)<t;
+ let r=calc({Gs:'2.65',rd:'1.60',w:'15',LL:'48',LP:'22'});ok('IP=26',r.ip==26);ok('e=0,656',cl(r.e,.65625));ok('n=39,6%',cl(r.n*100,39.62,.05));ok('S=60,6%',cl(r.Sr,60.57,.05));
+ ok('USCS CH (LL=60, IP=35)',uscs({p200:'80',LL:'60',LP:'25'},35).g=='CH');ok('USCS CL (LL=40, IP=20)',uscs({p200:'80',LL:'40'},20).g=='CL');ok('USCS ML (LL=30, IP=2)',uscs({p200:'60',LL:'30'},2).g=='ML');ok('USCS MH (LL=70, IP=15)',uscs({p200:'70',LL:'70'},15).g=='MH');
+ ok('ρd≥Gs rejeitado',validate({id:'x',Gs:'2.6',rd:'2.7'}).E.length>0);ok('S>100% rejeitado',validate({id:'x',Gs:'2.65',rd:'1.9',w:'40'}).E.length>0);ok('NP: LL<LP→IP=0',calc({LL:'20',LP:'25'}).ip==0);ok('Sem dados → sem estimativa',calc({}).e==null);
+ $('#tr').textContent=T.join('\n')};
+function go(){$('#nav').innerHTML=TABS.map((t,i)=>`<button class="${i==tab?'on':''}" onclick="tab=${i};go()">${t}</button>`).join('');$('#m').innerHTML=V[TABS[tab]]();save()}
+go();
+</script></body></html>
